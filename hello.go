@@ -14,7 +14,6 @@ import (
 	"github.com/liorfranko/configmap-attacher/options"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -28,21 +27,21 @@ func runCmd(str ...string) map[string]interface{} {
 	log.Infof("Running kubectl command: '%v'", cmd)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal("Could not kubectl command", err)
+		log.Fatal("Could not run kubectl, command: ", cmd, err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		log.Fatal("Could not start the CMD", err)
+		log.Fatal("Could not start the CMD, command: ", cmd, err)
 	}
 
 	data, err := ioutil.ReadAll(stdout)
 
 	if err != nil {
-		log.Fatal("Error while reading the kubectl output", err)
+		log.Fatal("Error while reading the kubectl output, command: ", cmd, err)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		log.Fatal("Error while waiting for the kubectl output", err)
+		log.Fatal("Error while waiting for the kubectl output, command: ", cmd, err)
 	}
 	var x map[string]interface{}
 	json.Unmarshal([]byte(data), &x)
@@ -112,14 +111,27 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
 	} else {
 		log.Fatal("metadata was not found in replicaset object")
 	}
-
+	// trueVar := true
+	// newOwnerReferences := []metav1.OwnerReference{
+	// 	{
+	// 		Kind:       "ReplicaSet",
+	// 		Name:       (rolloutPtr + "-" + newRs),
+	// 		APIVersion: "apps/v1",
+	// 		UID:        types.UID(uid),
+	// 		Controller: &trueVar,
+	// 	},
+	// }
+	// fmt.Println(newOwnerReferences)
+	// configmap.ObjectMeta.SetOwnerReferences(newOwnerReferences)
+	// fmt.Println(new2OwnerReference)
 	// Patch the configmap and set the replicaset as the owner using ownerReferences
 	patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"apps/v1","blockOwnerDeletion":true,"controller":true,"kind":"ReplicaSet","name":"%s-%s","uid":"%s"}]}}`, rolloutPtr, newRs, uid)
 	out, err := clientset.CoreV1().ConfigMaps(namespacePtr).Patch(context.Background(), configMapPtr, types.MergePatchType, []byte(patch), v1.PatchOptions{})
 	if err != nil {
 		log.Fatal("Could not patch the configmap", err)
 	}
-	log.Debug("Configmap %s has been patched, output: %s ", configMapPtr, out)
+	log.Debug("Configmap %s has been patched, output is: ", configMapPtr, out)
+	// log.Debug("Configmap %s has been patched", configMapPtr)
 }
 func main() {
 	// Set and parse CLI options

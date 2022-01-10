@@ -3,12 +3,12 @@ module github.com/liorfranko/configmap-attacher
 go 1.17
 
 require (
+	github.com/google/uuid v1.1.2
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/sirupsen/logrus v1.8.1
 	k8s.io/api v0.23.1
 	k8s.io/apimachinery v0.23.1
 	k8s.io/client-go v0.23.1
-	k8s.io/metrics v0.23.1
 )
 
 require (
