@@ -20,6 +20,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// TODO wait for replicaset
+// TODO Check if configmap is already attached
+
 func runCmd(str ...string) map[string]interface{} {
 	cmd := exec.Command("kubectl", str...)
 	log.Infof("Running kubectl command: '%v'", cmd)
@@ -55,33 +58,48 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
 		log.Fatal(err)
 	}
 
-	// Create an rest client not targeting specific API version
+	// Create a rest client not targeting specific API version
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	// Get the configmap 'configMapPtr' in namespace 'namespacePtr'
 	configmap, err := clientset.CoreV1().ConfigMaps(namespacePtr).Get(context.Background(), configMapPtr, metav1.GetOptions{})
 	if err != nil {
 		log.Fatalln("failed to get configmap:", err)
 	}
 
-	// print configmaps
-	log.Println("printing configmpas", configmap)
+	// print configmap
+	log.Debug("printing configmpas", configmap)
+	if configmap.ObjectMeta.GetOwnerReferences() != nil {
+		log.Fatal("configmap already has attached ownerReferences")
+	}
 
+	// Get the rollout using kubectl
 	x := runCmd("-n", namespacePtr, "get", "rollout", rolloutPtr, "-o", "json")
 	var newRs string
 	var uid string
+	// Extract the new Replicaset from the rollout object
 	if val, ok := x["status"]; ok {
 		v := val.(map[string]interface{})
-		if val2, ok2 := v["currentPodHash"]; ok2 {
-			newRs = fmt.Sprintf("%v", val2)
+		if val2, ok := v["phase"]; ok {
+			if val2 != "Paused" {
+				log.Fatal("Error: Something is wrong! The rollout status is not paused when the job was running")
+			} else {
+				if val3, ok := v["currentPodHash"]; ok {
+					newRs = fmt.Sprintf("%v", val3)
+				} else {
+					log.Fatal("currentPodHash was not found in rollout status")
+				}
+			}
 		} else {
-			log.Fatal("currentPodHash was not found in rollout status")
+			log.Fatal("phase was not found in rollout object")
 		}
 	} else {
 		log.Fatal("status was not found in rollout object")
 	}
+
+	// Extract the UID from the Replicaset object
 	x = runCmd("-n", namespacePtr, "get", "replicasets.apps", rolloutPtr+"-"+newRs, "-o", "json")
 	if val, ok := x["metadata"]; ok {
 		v := val.(map[string]interface{})
@@ -93,12 +111,14 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
 	} else {
 		log.Fatal("metadata was not found in replicaset object")
 	}
+
+	// Patch the configmap and set the replicaset as the owner using ownerReferences
 	patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"apps/v1","blockOwnerDeletion":true,"controller":true,"kind":"ReplicaSet","name":"%s-%s","uid":"%s"}]}}`, rolloutPtr, newRs, uid)
 	out, err := clientset.CoreV1().ConfigMaps(namespacePtr).Patch(context.Background(), configMapPtr, types.MergePatchType, []byte(patch), v1.PatchOptions{})
 	if err != nil {
 		panic(err.Error())
 	}
-	log.Infof("Configmap %s has been patched, output: %s ", configMapPtr, out)
+	log.Debug("Configmap %s has been patched, output: %s ", configMapPtr, out)
 }
 func main() {
 	// Set and parse CLI options
@@ -135,5 +155,5 @@ func main() {
 	log.Infof("Starting configmap-attacher v%v", opts.Version)
 	log.Infof("Configmap-attacher variables, configmap: %s, rollout: %s, namespace: %s", *configMapPtr, *rolloutPtr, *namespacePtr)
 	Runner(*configMapPtr, *rolloutPtr, *namespacePtr)
-
+	log.Infof("Done configmap-attacher")
 }
