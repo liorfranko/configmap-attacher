@@ -21,28 +21,28 @@ import (
 )
 
 // TODO wait for replicaset
-// TODO Check if configmap is already attached
+// Use SetOwnerReferences insteach of Patch
 
 func runCmd(str ...string) map[string]interface{} {
 	cmd := exec.Command("kubectl", str...)
 	log.Infof("Running kubectl command: '%v'", cmd)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Could not kubectl command", err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		log.Fatal("Could not start the CMD", err)
 	}
 
 	data, err := ioutil.ReadAll(stdout)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error while reading the kubectl output", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
+		log.Fatal("Error while waiting for the kubectl output", err)
 	}
 	var x map[string]interface{}
 	json.Unmarshal([]byte(data), &x)
@@ -55,13 +55,13 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
 	log.Println("Using kubeconfig file: ", kubeconfig)
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Could not create the clientcmd", err)
 	}
 
 	// Create a rest client not targeting specific API version
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Could not create the clientset", err)
 	}
 	// Get the configmap 'configMapPtr' in namespace 'namespacePtr'
 	configmap, err := clientset.CoreV1().ConfigMaps(namespacePtr).Get(context.Background(), configMapPtr, metav1.GetOptions{})
@@ -71,8 +71,9 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
 
 	// print configmap
 	log.Debug("printing configmpas", configmap)
-	if configmap.ObjectMeta.GetOwnerReferences() != nil {
-		log.Fatal("configmap already has attached ownerReferences")
+	OwnerReference := configmap.ObjectMeta.GetOwnerReferences()
+	if OwnerReference != nil {
+		log.Fatal("configmap already has attached ownerReferences, it is: ", OwnerReference)
 	}
 
 	// Get the rollout using kubectl
@@ -116,7 +117,7 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
 	patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"apps/v1","blockOwnerDeletion":true,"controller":true,"kind":"ReplicaSet","name":"%s-%s","uid":"%s"}]}}`, rolloutPtr, newRs, uid)
 	out, err := clientset.CoreV1().ConfigMaps(namespacePtr).Patch(context.Background(), configMapPtr, types.MergePatchType, []byte(patch), v1.PatchOptions{})
 	if err != nil {
-		panic(err.Error())
+		log.Fatal("Could not patch the configmap", err)
 	}
 	log.Debug("Configmap %s has been patched, output: %s ", configMapPtr, out)
 }
