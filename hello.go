@@ -14,6 +14,7 @@ import (
 	"github.com/liorfranko/configmap-attacher/options"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -72,7 +73,7 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
 	log.Debug("printing configmpas", configmap)
 	OwnerReference := configmap.ObjectMeta.GetOwnerReferences()
 	if OwnerReference != nil {
-		log.Fatal("configmap already has attached ownerReferences, it is: ", OwnerReference)
+		log.Println("configmap already has attached ownerReferences, it is: ", OwnerReference)
 	}
 
 	// Get the rollout using kubectl
@@ -82,18 +83,10 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
 	// Extract the new Replicaset from the rollout object
 	if val, ok := x["status"]; ok {
 		v := val.(map[string]interface{})
-		if val2, ok := v["phase"]; ok {
-			if val2 != "Paused" {
-				log.Fatal("Error: Something is wrong! The rollout status is not paused when the job was running")
-			} else {
-				if val3, ok := v["currentPodHash"]; ok {
-					newRs = fmt.Sprintf("%v", val3)
-				} else {
-					log.Fatal("currentPodHash was not found in rollout status")
-				}
-			}
+		if val3, ok := v["currentPodHash"]; ok {
+			newRs = fmt.Sprintf("%v", val3)
 		} else {
-			log.Fatal("phase was not found in rollout object")
+			log.Fatal("currentPodHash was not found in rollout status")
 		}
 	} else {
 		log.Fatal("status was not found in rollout object")
