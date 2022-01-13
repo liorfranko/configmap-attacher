@@ -11,7 +11,7 @@ type Options struct {
 
 	// Logger
 	// LogLevel - Logger's log granularity (debug, info, warn, error, fatal, panic)
-	LogLevel string `envconfig:"LOG_LEVEL" default:"info"`
+	LogLevel string `envconfig:"LOG_LEVEL" default:"debug"`
 }
 
 // NewOptions provides Application Options

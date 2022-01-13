@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/liorfranko/configmap-attacher/options"
@@ -22,6 +23,7 @@ import (
 
 // TODO wait for replicaset
 // Use SetOwnerReferences insteach of Patch
+// TODO Get more then one configmap
 
 func runCmd(str ...string) map[string]interface{} {
 	cmd := exec.Command("kubectl", str...)
@@ -50,31 +52,18 @@ func runCmd(str ...string) map[string]interface{} {
 
 }
 func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
-	// Bootstrap k8s configuration from local 	Kubernetes config file
-	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
-	log.Println("Using kubeconfig file: ", kubeconfig)
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		log.Fatal("Could not create the clientcmd", err)
-	}
 
-	// Create a rest client not targeting specific API version
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatal("Could not create the clientset", err)
-	}
-	// Get the configmap 'configMapPtr' in namespace 'namespacePtr'
-	configmap, err := clientset.CoreV1().ConfigMaps(namespacePtr).Get(context.Background(), configMapPtr, metav1.GetOptions{})
-	if err != nil {
-		log.Fatalln("failed to get configmap:", err)
-	}
+	// configmap, err := clientset.CoreV1().ConfigMaps(namespacePtr).Get(context.Background(), configMapPtr, metav1.GetOptions{})
+	// if err != nil {
+	// 	log.Fatalln("failed to get configmap:", err)
+	// }
 
 	// print configmap
-	log.Debug("printing configmpas", configmap)
-	OwnerReference := configmap.ObjectMeta.GetOwnerReferences()
-	if OwnerReference != nil {
-		log.Println("configmap already has attached ownerReferences, it is: ", OwnerReference)
-	}
+	// log.Debug("printing configmpas", configmap)
+	// OwnerReference := configmap.ObjectMeta.GetOwnerReferences()
+	// if OwnerReference != nil {
+	// 	log.Println("configmap already has attached ownerReferences, it is: ", OwnerReference)
+	// }
 
 	// Get the rollout using kubectl
 	x := runCmd("-n", namespacePtr, "get", "rollout", rolloutPtr, "-o", "json")
@@ -118,22 +107,44 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
 	// configmap.ObjectMeta.SetOwnerReferences(newOwnerReferences)
 	// fmt.Println(new2OwnerReference)
 	// Patch the configmap and set the replicaset as the owner using ownerReferences
-	patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"apps/v1","blockOwnerDeletion":true,"controller":true,"kind":"ReplicaSet","name":"%s-%s","uid":"%s"}]}}`, rolloutPtr, newRs, uid)
-	out, err := clientset.CoreV1().ConfigMaps(namespacePtr).Patch(context.Background(), configMapPtr, types.MergePatchType, []byte(patch), v1.PatchOptions{})
+	// Bootstrap k8s configuration from local 	Kubernetes config file
+	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	log.Println("Using kubeconfig file: ", kubeconfig)
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		log.Fatal("Could not patch the configmap", err)
+		log.Fatal("Could not create the clientcmd", err)
 	}
-	log.Debug("Configmap %s has been patched, output is: ", configMapPtr, out)
+
+	// Create a rest client not targeting specific API version
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal("Could not create the clientset", err)
+	}
+	// Get the configmap 'configMapPtr' in namespace 'namespacePtr'
+	configmaps := strings.Split(configMapPtr, ",")
+	// var cm []*corev1.ConfigMap
+	for i, configmap := range configmaps {
+		log.Debug("Checking that configmap exists: ", i, configmap)
+		_, err := clientset.CoreV1().ConfigMaps(namespacePtr).Get(context.Background(), configmap, metav1.GetOptions{})
+		if err != nil {
+			log.Fatalln("failed to get configmap:", configmap, err)
+		}
+		patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"apps/v1","blockOwnerDeletion":true,"controller":true,"kind":"ReplicaSet","name":"%s-%s","uid":"%s"}]}}`, rolloutPtr, newRs, uid)
+		out, err := clientset.CoreV1().ConfigMaps(namespacePtr).Patch(context.Background(), configmap, types.MergePatchType, []byte(patch), v1.PatchOptions{})
+		if err != nil {
+			log.Fatal("Could not patch the configmap:", configmap, err)
+		}
+		log.Debug("Configmap %s has been patched, output is: ", configmap, out)
+	}
 	// log.Debug("Configmap %s has been patched", configMapPtr)
 }
 func main() {
 	// Set and parse CLI options
-	configMapPtr := flag.String("configmap", "", "Configmap to add the ownerReference")
+	configMapPtr := flag.String("configmaps", "", "Configmaps to add the ownerReference, for multiple configmaps use ',' as a separator")
 	rolloutPtr := flag.String("rollout", "", "Rollout that will be the ownerReference")
 	namespacePtr := flag.String("namespace", "", "The namespace of the rollout and configmap")
 	flag.Parse()
-
-	fmt.Printf("configMapPtr: %s, rolloutPtr: %s, namespacePtr: %s\n", *configMapPtr, *rolloutPtr, *namespacePtr)
+	log.Debug("configMapPtr: %s, rolloutPtr: %s, namespacePtr: %s\n", *configMapPtr, *rolloutPtr, *namespacePtr)
 	if *configMapPtr == "" || *rolloutPtr == "" || *namespacePtr == "" {
 		flag.PrintDefaults()
 		os.Exit(1)
