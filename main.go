@@ -1,29 +1,24 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/liorfranko/configmap-attacher/kubernetes"
 	"github.com/liorfranko/configmap-attacher/options"
 	log "github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // TODO wait for replicaset
-// Use SetOwnerReferences insteach of Patch
-// TODO Get more then one configmap
+// TODO Replace kubectl commands CRD client
+// TODO Use SetOwnerReferences insteach of Patch
+// TODO Add support for running from inside the cluster
 
 func runCmd(str ...string) map[string]interface{} {
 	cmd := exec.Command("kubectl", str...)
@@ -51,20 +46,7 @@ func runCmd(str ...string) map[string]interface{} {
 	return x
 
 }
-func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
-
-	// configmap, err := clientset.CoreV1().ConfigMaps(namespacePtr).Get(context.Background(), configMapPtr, metav1.GetOptions{})
-	// if err != nil {
-	// 	log.Fatalln("failed to get configmap:", err)
-	// }
-
-	// print configmap
-	// log.Debug("printing configmpas", configmap)
-	// OwnerReference := configmap.ObjectMeta.GetOwnerReferences()
-	// if OwnerReference != nil {
-	// 	log.Println("configmap already has attached ownerReferences, it is: ", OwnerReference)
-	// }
-
+func Runner(configMapPtr string, rolloutPtr string, namespacePtr string, opts *options.Options) {
 	// Get the rollout using kubectl
 	x := runCmd("-n", namespacePtr, "get", "rollout", rolloutPtr, "-o", "json")
 	var newRs string
@@ -107,37 +89,23 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string) {
 	// configmap.ObjectMeta.SetOwnerReferences(newOwnerReferences)
 	// fmt.Println(new2OwnerReference)
 	// Patch the configmap and set the replicaset as the owner using ownerReferences
-	// Bootstrap k8s configuration from local 	Kubernetes config file
-	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
-	log.Println("Using kubeconfig file: ", kubeconfig)
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		log.Fatal("Could not create the clientcmd", err)
-	}
 
-	// Create a rest client not targeting specific API version
-	clientset, err := kubernetes.NewForConfig(config)
+	// Bootstrap k8s configuration from local 	Kubernetes config file
+	kubernetesClient, err := kubernetes.NewClient(opts)
 	if err != nil {
-		log.Fatal("Could not create the clientset", err)
+		log.Fatal("failed to initialize kubernetes client: '%v'", err)
 	}
-	// Get the configmap 'configMapPtr' in namespace 'namespacePtr'
+	fmt.Println(kubernetesClient.IsHealthy(), uid)
+	// Split the configmaps
 	configmaps := strings.Split(configMapPtr, ",")
 	// var cm []*corev1.ConfigMap
 	for i, configmap := range configmaps {
 		log.Debug("Checking that configmap exists: ", i, configmap)
-		_, err := clientset.CoreV1().ConfigMaps(namespacePtr).Get(context.Background(), configmap, metav1.GetOptions{})
-		if err != nil {
-			log.Fatalln("failed to get configmap:", configmap, err)
-		}
-		patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"apps/v1","blockOwnerDeletion":true,"controller":true,"kind":"ReplicaSet","name":"%s-%s","uid":"%s"}]}}`, rolloutPtr, newRs, uid)
-		out, err := clientset.CoreV1().ConfigMaps(namespacePtr).Patch(context.Background(), configmap, types.MergePatchType, []byte(patch), v1.PatchOptions{})
-		if err != nil {
-			log.Fatal("Could not patch the configmap:", configmap, err)
-		}
-		log.Debug("Configmap %s has been patched, output is: ", configmap, out)
+		fmt.Println(kubernetesClient.IsHealthy())
+		kubernetesClient.PatchConfigmap(configmap, namespacePtr, rolloutPtr, newRs, uid)
 	}
-	// log.Debug("Configmap %s has been patched", configMapPtr)
 }
+
 func main() {
 	// Set and parse CLI options
 	configMapPtr := flag.String("configmaps", "", "Configmaps to add the ownerReference, for multiple configmaps use ',' as a separator")
@@ -171,6 +139,6 @@ func main() {
 	// Start configmap-attacher
 	log.Infof("Starting configmap-attacher v%v", opts.Version)
 	log.Infof("Configmap-attacher variables, configmap: %s, rollout: %s, namespace: %s", *configMapPtr, *rolloutPtr, *namespacePtr)
-	Runner(*configMapPtr, *rolloutPtr, *namespacePtr)
+	Runner(*configMapPtr, *rolloutPtr, *namespacePtr, opts)
 	log.Infof("Done configmap-attacher")
 }
