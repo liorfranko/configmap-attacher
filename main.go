@@ -1,11 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"io/ioutil"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
@@ -19,32 +16,6 @@ import (
 // TODO Use SetOwnerReferences insteach of Patch
 // TODO Add support for running from inside the cluster
 
-func runCmd(str ...string) map[string]interface{} {
-	cmd := exec.Command("kubectl", str...)
-	log.Infof("Running kubectl command: '%v'", cmd)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Fatal("Could not run kubectl, command: ", cmd, err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		log.Fatal("Could not start the CMD, command: ", cmd, err)
-	}
-
-	data, err := ioutil.ReadAll(stdout)
-
-	if err != nil {
-		log.Fatal("Error while reading the kubectl output, command: ", cmd, err)
-	}
-
-	if err := cmd.Wait(); err != nil {
-		log.Fatal("Error while waiting for the kubectl output, command: ", cmd, err)
-	}
-	var x map[string]interface{}
-	json.Unmarshal([]byte(data), &x)
-	return x
-
-}
 func Runner(configMapPtr string, rolloutPtr string, namespacePtr string, opts *options.Options) {
 	// Bootstrap k8s configuration from local 	Kubernetes config file
 	kubernetesClient, err := kubernetes.NewClient(opts)
@@ -57,23 +28,9 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string, opts *o
 	}
 	uid, err := kubernetesClient.GetReplicaSetInfo(namespacePtr, rolloutPtr+"-"+newRs)
 	if err != nil {
-		log.Fatal("currentPodHash was not found in rollout: '%v'", err)
+		log.Fatal("Replicaset was not found: '%v'", err)
 	}
 
-	// Extract the UID from the Replicaset object
-	// x := runCmd("-n", namespacePtr, "get", "replicasets.apps", rolloutPtr+"-"+newRs, "-o", "json")
-	// if val, ok := x["metadata"]; ok {
-	// 	v := val.(map[string]interface{})
-	// 	if val2, ok2 := v["uid"]; ok2 {
-	// 		uid = fmt.Sprintf("%v", val2)
-	// 	} else {
-	// 		log.Fatal("uid was not found in metadata.replicaset object")
-	// 	}
-	// } else {
-	// 	log.Fatal("metadata was not found in replicaset object")
-	// }
-
-	kubernetesClient.GetRolloutInfo(namespacePtr, rolloutPtr)
 	// Split the configmaps
 	configmaps := strings.Split(configMapPtr, ",")
 	// Patch each configmap
