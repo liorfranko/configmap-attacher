@@ -47,24 +47,20 @@ func runCmd(str ...string) map[string]interface{} {
 
 }
 func Runner(configMapPtr string, rolloutPtr string, namespacePtr string, opts *options.Options) {
-	// Get the rollout using kubectl
-	x := runCmd("-n", namespacePtr, "get", "rollout", rolloutPtr, "-o", "json")
-	var newRs string
-	var uid string
-	// Extract the new Replicaset from the rollout object
-	if val, ok := x["status"]; ok {
-		v := val.(map[string]interface{})
-		if val3, ok := v["currentPodHash"]; ok {
-			newRs = fmt.Sprintf("%v", val3)
-		} else {
-			log.Fatal("currentPodHash was not found in rollout status")
-		}
-	} else {
-		log.Fatal("status was not found in rollout object")
+	// Bootstrap k8s configuration from local 	Kubernetes config file
+	kubernetesClient, err := kubernetes.NewClient(opts)
+	if err != nil {
+		log.Fatal("failed to initialize kubernetes client: '%v'", err)
+	}
+	newRs, err := kubernetesClient.GetRolloutInfo(namespacePtr, rolloutPtr)
+	if err != nil {
+		log.Fatal("currentPodHash was not found in rollout: '%v'", err)
 	}
 
+	var uid string
+
 	// Extract the UID from the Replicaset object
-	x = runCmd("-n", namespacePtr, "get", "replicasets.apps", rolloutPtr+"-"+newRs, "-o", "json")
+	x := runCmd("-n", namespacePtr, "get", "replicasets.apps", rolloutPtr+"-"+newRs, "-o", "json")
 	if val, ok := x["metadata"]; ok {
 		v := val.(map[string]interface{})
 		if val2, ok2 := v["uid"]; ok2 {
@@ -74,12 +70,6 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string, opts *o
 		}
 	} else {
 		log.Fatal("metadata was not found in replicaset object")
-	}
-
-	// Bootstrap k8s configuration from local 	Kubernetes config file
-	kubernetesClient, err := kubernetes.NewClient(opts)
-	if err != nil {
-		log.Fatal("failed to initialize kubernetes client: '%v'", err)
 	}
 
 	kubernetesClient.GetRolloutInfo(namespacePtr, rolloutPtr)

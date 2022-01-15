@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -81,17 +80,12 @@ func (c *Client) IsHealthy() bool {
 	return true
 }
 
-func (c *Client) GetRolloutInfo(namespace string, rollout string) (string, string, error) {
-	rollouts, err := c.argoClient.Rollouts(namespace).List(metav1.ListOptions{})
+func (c *Client) GetRolloutInfo(namespace string, rolloutName string) (string, error) {
+	rollout, err := c.argoClient.Rollouts(namespace).Get(rolloutName, metav1.GetOptions{})
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	// fmt.Printf("Rollouts found: %+v\n", reflect.TypeOf(rollouts))
-	// fmt.Printf("Rollouts found: %+v\n", rollouts)
-	j, _ := json.MarshalIndent(rollouts.Items, "", "    ")
-	fmt.Print(string(j))
-
-	return "", "", nil
+	return rollout.Status.CurrentPodHash, nil
 }
 func (c *Client) PatchConfigmap(configmap string, namespace string, rollout string, newRs string, uid string) {
 	// trueVar := true
