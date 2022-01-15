@@ -81,6 +81,8 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string, opts *o
 	if err != nil {
 		log.Fatal("failed to initialize kubernetes client: '%v'", err)
 	}
+
+	kubernetesClient.GetRolloutInfo(namespacePtr, rolloutPtr)
 	// Split the configmaps
 	configmaps := strings.Split(configMapPtr, ",")
 	// Patch each configmap

@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,7 +22,8 @@ import (
 )
 
 type Client struct {
-	apiClient *kubernetes.Clientset
+	apiClient  *kubernetes.Clientset
+	argoClient *clientV1alpha1.ExampleV1Alpha1Client
 }
 
 // NewClient creates a new client to get data from kubernetes masters
@@ -51,24 +53,18 @@ func NewClient(opts *options.Options) (*Client, error) {
 
 	v1alpha1.AddToScheme(scheme.Scheme)
 
-	clientSet, err := clientV1alpha1.NewForConfig(config)
+	argoClient, err := clientV1alpha1.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("error creating kubernetes argo client: '%v'", err)
 	}
-
-	rollouts, err := clientSet.Rollouts("devops-apps-01").List(metav1.ListOptions{})
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("Rollouts found: %+v\n", rollouts)
-
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating kubernetes main client: '%v'", err)
 	}
 
 	return &Client{
-		apiClient: client,
+		apiClient:  client,
+		argoClient: argoClient,
 	}, nil
 }
 
@@ -85,6 +81,18 @@ func (c *Client) IsHealthy() bool {
 	return true
 }
 
+func (c *Client) GetRolloutInfo(namespace string, rollout string) (string, string, error) {
+	rollouts, err := c.argoClient.Rollouts(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return "", "", err
+	}
+	// fmt.Printf("Rollouts found: %+v\n", reflect.TypeOf(rollouts))
+	// fmt.Printf("Rollouts found: %+v\n", rollouts)
+	j, _ := json.MarshalIndent(rollouts.Items, "", "    ")
+	fmt.Print(string(j))
+
+	return "", "", nil
+}
 func (c *Client) PatchConfigmap(configmap string, namespace string, rollout string, newRs string, uid string) {
 	// trueVar := true
 	// newOwnerReferences := []metav1.OwnerReference{
