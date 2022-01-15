@@ -87,7 +87,8 @@ func (c *Client) GetRolloutInfo(namespace string, rolloutName string) (string, e
 	}
 	return rollout.Status.CurrentPodHash, nil
 }
-func (c *Client) PatchConfigmap(configmap string, namespace string, rollout string, newRs string, uid string) {
+
+func (c *Client) PatchConfigmap(configmap string, namespace string, rollout string, newRs string, uid types.UID) {
 	// trueVar := true
 	// newOwnerReferences := []metav1.OwnerReference{
 	// 	{
@@ -138,4 +139,15 @@ func getKubeConfigPath() (string, error) {
 	}
 
 	return "", fmt.Errorf("couldn't find home directory to look for the kube config")
+}
+
+func (c *Client) GetReplicaSetInfo(namespace string, replicaset string) (types.UID, error) {
+	out, err := c.apiClient.AppsV1().ReplicaSets(namespace).Get(context.Background(), replicaset, metav1.GetOptions{})
+
+	if err != nil {
+		return "", err
+	}
+
+	return out.ObjectMeta.GetUID(), err
+	// c.ReplicaSets(namespace).Get(replicaSetName, metav1.GetOptions{})
 }

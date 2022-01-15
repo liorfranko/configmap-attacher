@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -56,21 +55,23 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string, opts *o
 	if err != nil {
 		log.Fatal("currentPodHash was not found in rollout: '%v'", err)
 	}
-
-	var uid string
+	uid, err := kubernetesClient.GetReplicaSetInfo(namespacePtr, rolloutPtr+"-"+newRs)
+	if err != nil {
+		log.Fatal("currentPodHash was not found in rollout: '%v'", err)
+	}
 
 	// Extract the UID from the Replicaset object
-	x := runCmd("-n", namespacePtr, "get", "replicasets.apps", rolloutPtr+"-"+newRs, "-o", "json")
-	if val, ok := x["metadata"]; ok {
-		v := val.(map[string]interface{})
-		if val2, ok2 := v["uid"]; ok2 {
-			uid = fmt.Sprintf("%v", val2)
-		} else {
-			log.Fatal("uid was not found in metadata.replicaset object")
-		}
-	} else {
-		log.Fatal("metadata was not found in replicaset object")
-	}
+	// x := runCmd("-n", namespacePtr, "get", "replicasets.apps", rolloutPtr+"-"+newRs, "-o", "json")
+	// if val, ok := x["metadata"]; ok {
+	// 	v := val.(map[string]interface{})
+	// 	if val2, ok2 := v["uid"]; ok2 {
+	// 		uid = fmt.Sprintf("%v", val2)
+	// 	} else {
+	// 		log.Fatal("uid was not found in metadata.replicaset object")
+	// 	}
+	// } else {
+	// 	log.Fatal("metadata was not found in replicaset object")
+	// }
 
 	kubernetesClient.GetRolloutInfo(namespacePtr, rolloutPtr)
 	// Split the configmaps
