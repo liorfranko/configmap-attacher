@@ -75,33 +75,17 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string, opts *o
 	} else {
 		log.Fatal("metadata was not found in replicaset object")
 	}
-	// trueVar := true
-	// newOwnerReferences := []metav1.OwnerReference{
-	// 	{
-	// 		Kind:       "ReplicaSet",
-	// 		Name:       (rolloutPtr + "-" + newRs),
-	// 		APIVersion: "apps/v1",
-	// 		UID:        types.UID(uid),
-	// 		Controller: &trueVar,
-	// 	},
-	// }
-	// fmt.Println(newOwnerReferences)
-	// configmap.ObjectMeta.SetOwnerReferences(newOwnerReferences)
-	// fmt.Println(new2OwnerReference)
-	// Patch the configmap and set the replicaset as the owner using ownerReferences
 
 	// Bootstrap k8s configuration from local 	Kubernetes config file
 	kubernetesClient, err := kubernetes.NewClient(opts)
 	if err != nil {
 		log.Fatal("failed to initialize kubernetes client: '%v'", err)
 	}
-	fmt.Println(kubernetesClient.IsHealthy(), uid)
 	// Split the configmaps
 	configmaps := strings.Split(configMapPtr, ",")
-	// var cm []*corev1.ConfigMap
+	// Patch each configmap
 	for i, configmap := range configmaps {
 		log.Debug("Checking that configmap exists: ", i, configmap)
-		fmt.Println(kubernetesClient.IsHealthy())
 		kubernetesClient.PatchConfigmap(configmap, namespacePtr, rolloutPtr, newRs, uid)
 	}
 }
@@ -112,7 +96,6 @@ func main() {
 	rolloutPtr := flag.String("rollout", "", "Rollout that will be the ownerReference")
 	namespacePtr := flag.String("namespace", "", "The namespace of the rollout and configmap")
 	flag.Parse()
-	log.Debug("configMapPtr: %s, rolloutPtr: %s, namespacePtr: %s\n", *configMapPtr, *rolloutPtr, *namespacePtr)
 	if *configMapPtr == "" || *rolloutPtr == "" || *namespacePtr == "" {
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -132,13 +115,12 @@ func main() {
 	// Set log level from environment variable
 	level, err := log.ParseLevel(opts.LogLevel)
 	if err != nil {
-		log.Panicf("Loglevel could not be parsed as one of the known loglevels. See logrus documentation for valid log level inputs. Given input was: '%s'", opts.LogLevel)
+		log.Fatal("Loglevel could not be parsed as one of the known loglevels. See logrus documentation for valid log level inputs. Given input was: '%s'", opts.LogLevel)
 	}
 	log.SetLevel(level)
-
+	log.Infof("Starting configmap-attacher")
+	log.Infof("configmaps: %s, rollout: %s, namespace: %s\n", *configMapPtr, *rolloutPtr, *namespacePtr)
 	// Start configmap-attacher
-	log.Infof("Starting configmap-attacher v%v", opts.Version)
-	log.Infof("Configmap-attacher variables, configmap: %s, rollout: %s, namespace: %s", *configMapPtr, *rolloutPtr, *namespacePtr)
 	Runner(*configMapPtr, *rolloutPtr, *namespacePtr, opts)
 	log.Infof("Done configmap-attacher")
 }

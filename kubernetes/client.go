@@ -6,22 +6,22 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/liorfranko/configmap-attacher/api/types/v1alpha1"
+	clientV1alpha1 "github.com/liorfranko/configmap-attacher/clientset/v1alpha1"
 	"github.com/liorfranko/configmap-attacher/options"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // Auth required for out of cluster connections
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
-// Client provides methods to get all required metrics from Kubernetes
 type Client struct {
-	apiClient     *kubernetes.Clientset
-	metricsClient *metrics.Clientset
+	apiClient *kubernetes.Clientset
 }
 
 // NewClient creates a new client to get data from kubernetes masters
@@ -49,26 +49,31 @@ func NewClient(opts *options.Options) (*Client, error) {
 		}
 	}
 
-	// We got two clients, one for the common API and one explicitly for metrics
+	v1alpha1.AddToScheme(scheme.Scheme)
+
+	clientSet, err := clientV1alpha1.NewForConfig(config)
+	if err != nil {
+		panic(err)
+	}
+
+	projects, err := clientSet.Projects("default").List(metav1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("projects found: %+v\n", projects)
+
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating kubernetes main client: '%v'", err)
 	}
 
-	metricsClient, err := metrics.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating kubernetes metrics client: '%v'", err)
-	}
-
 	return &Client{
-		apiClient:     client,
-		metricsClient: metricsClient,
+		apiClient: client,
 	}, nil
 }
 
 // IsHealthy returns whether the kubernetes client is able to get a list of all pods
 func (c *Client) IsHealthy() bool {
-	fmt.Println("Live")
 	_, err := c.apiClient.CoreV1().Pods(metav1.NamespaceSystem).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -81,6 +86,20 @@ func (c *Client) IsHealthy() bool {
 }
 
 func (c *Client) PatchConfigmap(configmap string, namespace string, rollout string, newRs string, uid string) {
+	// trueVar := true
+	// newOwnerReferences := []metav1.OwnerReference{
+	// 	{
+	// 		Kind:       "ReplicaSet",
+	// 		Name:       (rolloutPtr + "-" + newRs),
+	// 		APIVersion: "apps/v1",
+	// 		UID:        types.UID(uid),
+	// 		Controller: &trueVar,
+	// 	},
+	// }
+	// fmt.Println(newOwnerReferences)
+	// configmap.ObjectMeta.SetOwnerReferences(newOwnerReferences)
+	// fmt.Println(new2OwnerReference)
+	// Patch the configmap and set the replicaset as the owner using ownerReferences
 	_, err := c.apiClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), configmap, metav1.GetOptions{})
 	if err != nil {
 		log.Fatalln("failed to get configmap:", configmap, err)
