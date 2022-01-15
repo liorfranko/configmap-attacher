@@ -10,25 +10,25 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type ProjectInterface interface {
-	List(opts metav1.ListOptions) (*v1alpha1.ProjectList, error)
-	Get(name string, options metav1.GetOptions) (*v1alpha1.Project, error)
-	Create(*v1alpha1.Project) (*v1alpha1.Project, error)
+type RolloutInterface interface {
+	List(opts metav1.ListOptions) (*v1alpha1.RolloutList, error)
+	Get(name string, options metav1.GetOptions) (*v1alpha1.Rollout, error)
+	Create(*v1alpha1.Rollout) (*v1alpha1.Rollout, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	// ...
 }
 
-type projectClient struct {
+type rolloutClient struct {
 	restClient rest.Interface
 	ns         string
 }
 
-func (c *projectClient) List(opts metav1.ListOptions) (*v1alpha1.ProjectList, error) {
-	result := v1alpha1.ProjectList{}
+func (c *rolloutClient) List(opts metav1.ListOptions) (*v1alpha1.RolloutList, error) {
+	result := v1alpha1.RolloutList{}
 	err := c.restClient.
 		Get().
 		Namespace(c.ns).
-		Resource("projects").
+		Resource("rollouts").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do(context.Background()).
 		Into(&result)
@@ -36,12 +36,12 @@ func (c *projectClient) List(opts metav1.ListOptions) (*v1alpha1.ProjectList, er
 	return &result, err
 }
 
-func (c *projectClient) Get(name string, opts metav1.GetOptions) (*v1alpha1.Project, error) {
-	result := v1alpha1.Project{}
+func (c *rolloutClient) Get(name string, opts metav1.GetOptions) (*v1alpha1.Rollout, error) {
+	result := v1alpha1.Rollout{}
 	err := c.restClient.
 		Get().
 		Namespace(c.ns).
-		Resource("projects").
+		Resource("rollouts").
 		Name(name).
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do(context.Background()).
@@ -50,25 +50,25 @@ func (c *projectClient) Get(name string, opts metav1.GetOptions) (*v1alpha1.Proj
 	return &result, err
 }
 
-func (c *projectClient) Create(project *v1alpha1.Project) (*v1alpha1.Project, error) {
-	result := v1alpha1.Project{}
+func (c *rolloutClient) Create(rollout *v1alpha1.Rollout) (*v1alpha1.Rollout, error) {
+	result := v1alpha1.Rollout{}
 	err := c.restClient.
 		Post().
 		Namespace(c.ns).
-		Resource("projects").
-		Body(project).
+		Resource("rollouts").
+		Body(rollout).
 		Do(context.Background()).
 		Into(&result)
 
 	return &result, err
 }
 
-func (c *projectClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *rolloutClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.restClient.
 		Get().
 		Namespace(c.ns).
-		Resource("projects").
+		Resource("rollouts").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch(context.Background())
 }

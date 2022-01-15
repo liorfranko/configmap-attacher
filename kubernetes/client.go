@@ -56,11 +56,11 @@ func NewClient(opts *options.Options) (*Client, error) {
 		panic(err)
 	}
 
-	projects, err := clientSet.Projects("default").List(metav1.ListOptions{})
+	rollouts, err := clientSet.Rollouts("devops-apps-01").List(metav1.ListOptions{})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("projects found: %+v\n", projects)
+	fmt.Printf("Rollouts found: %+v\n", rollouts)
 
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {

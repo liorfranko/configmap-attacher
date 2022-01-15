@@ -6,7 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const GroupName = "example.martin-helmich.de"
+const GroupName = "argoproj.io"
 const GroupVersion = "v1alpha1"
 
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: GroupVersion}
@@ -18,8 +18,8 @@ var (
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Project{},
-		&ProjectList{},
+		&Rollout{},
+		&RolloutList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

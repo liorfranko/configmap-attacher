@@ -8,7 +8,7 @@ import (
 )
 
 type ExampleV1Alpha1Interface interface {
-	Projects(namespace string) ProjectInterface
+	Rollouts(namespace string) RolloutInterface
 }
 
 type ExampleV1Alpha1Client struct {
@@ -30,8 +30,8 @@ func NewForConfig(c *rest.Config) (*ExampleV1Alpha1Client, error) {
 	return &ExampleV1Alpha1Client{restClient: client}, nil
 }
 
-func (c *ExampleV1Alpha1Client) Projects(namespace string) ProjectInterface {
-	return &projectClient{
+func (c *ExampleV1Alpha1Client) Rollouts(namespace string) RolloutInterface {
+	return &rolloutClient{
 		restClient: c.restClient,
 		ns:         namespace,
 	}
