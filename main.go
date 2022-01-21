@@ -12,9 +12,7 @@ import (
 )
 
 // TODO wait for replicaset
-// TODO Replace kubectl commands CRD client
 // TODO Use SetOwnerReferences insteach of Patch
-// TODO Add support for running from inside the cluster
 
 func Runner(configMapPtr string, rolloutPtr string, namespacePtr string, opts *options.Options) {
 	// Bootstrap k8s configuration from local 	Kubernetes config file
@@ -35,7 +33,7 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string, opts *o
 	configmaps := strings.Split(configMapPtr, ",")
 	// Patch each configmap
 	for i, configmap := range configmaps {
-		log.Debug("Checking that configmap exists: ", i, configmap)
+		log.Debug("Patching configmap: ", i, configmap)
 		kubernetesClient.PatchConfigmap(configmap, namespacePtr, rolloutPtr, newRs, uid)
 	}
 }
