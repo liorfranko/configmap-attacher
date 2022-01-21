@@ -102,7 +102,7 @@ spec:
       containers:
       - name: configmap-attacher-job
         args: ["-rollout", "<Rollout Name>", "-namespace", "<Namespace>", "-configmaps", <Configmap name>]
-        image: 032106861074.dkr.ecr.us-east-1.amazonaws.com/configmap-attacher:8801e789203dd0c3aa8122c18ecc0a73c1ac9225
+        image: quay.io/liorfranko/configmap-attacher:1.0.1
         resources:
           limits:
             cpu: 0.1
@@ -112,7 +112,7 @@ spec:
             memory: 100Mi
         env:
           - name: VERSION
-            value: "8801e789203dd0c3aa8122c18ecc0a73c1ac9225"
+            value: "1.0.1"
       restartPolicy: OnFailure
       serviceAccountName: configmap-attacher-job
 ```
