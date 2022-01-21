@@ -66,7 +66,7 @@ func main() {
 		log.Fatal("Loglevel could not be parsed as one of the known loglevels. See logrus documentation for valid log level inputs. Given input was: '%s'", opts.LogLevel)
 	}
 	log.SetLevel(level)
-	log.Infof("Starting configmap-attacher")
+	log.Infof("Starting configmap-attacher version: %v", opts.Version)
 	log.Infof("configmaps: %s, rollout: %s, namespace: %s\n", *configMapPtr, *rolloutPtr, *namespacePtr)
 	// Start configmap-attacher
 	Runner(*configMapPtr, *rolloutPtr, *namespacePtr, opts)
