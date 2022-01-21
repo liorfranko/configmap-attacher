@@ -1,4 +1,4 @@
-# # build image
+# build image
 FROM golang:1.17.6-alpine as builder
 RUN apk update && apk add git ca-certificates
 

@@ -10,8 +10,14 @@ This container was built to solve the problem of revisioned configmaps on Kubern
 * `-namespace` - The namespace of the rollout and configmaps
 * `-configmaps` - One or more configmaps, for multiple configmaps use "," as a seperator
 
+## Environmet Variables
+| Variable name | Description | Default | Required |
+| --- | --- | --- | --- |
+| IS_IN_CLUSTER | Whether to use in cluster communication or to look for a kubeconfig in home directory | true | N/A |
+| LOG_LEVEL | Logger's log granularity (debug, info, warn, error, fatal, panic) | info |N/A |
+| VERSION | For logging audit please add the version of the configmap-attacher | None | true |
 ## Permissions
-The container needs the following permissions to work:
+To make the configmap-attacher work on any namespace, it's better to deploy it in kube-system with ClusterRole permissions, you can use the following:
 ```
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -29,7 +35,6 @@ rules:
   - get
   - list
   - watch
-# replicaset access needed for managing ReplicaSets
 - apiGroups:
   - apps
   resources:
