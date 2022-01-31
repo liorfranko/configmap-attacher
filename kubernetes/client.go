@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"github.com/liorfranko/configmap-attacher/api/types/v1alpha1"
 	clientV1alpha1 "github.com/liorfranko/configmap-attacher/clientset/v1alpha1"
@@ -15,6 +16,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth" // Auth required for out of cluster connections
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // Auth required for out of cluster connections
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -30,7 +32,7 @@ func NewClient(opts *options.Options) (*Client, error) {
 	// Get right config to connect to kubernetes
 	var config *rest.Config
 	if opts.IsInCluster {
-		log.Info("Creating InCluster config to communicate with Kubernetes master")
+		log.Infof("Creating InCluster config to communicate with Kubernetes master")
 		var err error
 		config, err = rest.InClusterConfig()
 		if err != nil {
@@ -38,7 +40,7 @@ func NewClient(opts *options.Options) (*Client, error) {
 		}
 	} else {
 		// Try to read currently set kubernetes config from your local kube config
-		log.Info("Looking for Kubernetes config to communicate with Kubernetes master")
+		log.Infof("Looking for Kubernetes config to communicate with Kubernetes master")
 		kubeConfigPath, err := getKubeConfigPath()
 		if err != nil {
 			return nil, err
@@ -100,30 +102,67 @@ func (c *Client) GetReplicaSetInfo(namespace string, replicaset string) (types.U
 }
 
 func (c *Client) PatchConfigmap(configmap string, namespace string, rollout string, newRs string, uid types.UID) {
-	// trueVar := true
-	// newOwnerReferences := []metav1.OwnerReference{
-	// 	{
-	// 		Kind:       "ReplicaSet",
-	// 		Name:       (rolloutPtr + "-" + newRs),
-	// 		APIVersion: "apps/v1",
-	// 		UID:        types.UID(uid),
-	// 		Controller: &trueVar,
-	// 	},
-	// }
-	// fmt.Println(newOwnerReferences)
-	// configmap.ObjectMeta.SetOwnerReferences(newOwnerReferences)
-	// fmt.Println(new2OwnerReference)
-	// Patch the configmap and set the replicaset as the owner using ownerReferences
-	_, err := c.apiClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), configmap, metav1.GetOptions{})
-	if err != nil {
-		log.Fatalln("failed to get configmap:", configmap, err)
+	// Creating the OwnerReferences for patching
+	trueVar := true
+	newOwnerReferences := []metav1.OwnerReference{
+		{
+			Kind:               "ReplicaSet",
+			Name:               (rollout + "-" + newRs),
+			APIVersion:         "apps/v1",
+			UID:                types.UID(uid),
+			Controller:         &trueVar,
+			BlockOwnerDeletion: &trueVar,
+		},
 	}
+
+	// Creating the OwnerReferences for patching using Patch command
 	patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"apps/v1","blockOwnerDeletion":true,"controller":true,"kind":"ReplicaSet","name":"%s-%s","uid":"%s"}]}}`, rollout, newRs, uid)
-	out, err := c.apiClient.CoreV1().ConfigMaps(namespace).Patch(context.Background(), configmap, types.MergePatchType, []byte(patch), v1.PatchOptions{})
+
+	log.Debugf("newOwnerReferences is: %s", newOwnerReferences)
+	log.Debugf("patch is: %s", patch)
+
+	// Get the configmap object
+	configmapObj, err := c.apiClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), configmap, metav1.GetOptions{})
 	if err != nil {
-		log.Fatal("Could not patch the configmap:", configmap, err)
+		log.Fatalf("failed to get configmap: %s, err: %s", configmap, err)
 	}
-	log.Debug("Configmap %s has been patched, output is: ", configmap, out)
+
+	log.Debugf("Going to patch configmap '%s' using SetOwnerReferences ", configmapObj)
+	// Patch the configmap using SetOwnerReferences
+	configmapObj.ObjectMeta.SetOwnerReferences(newOwnerReferences)
+	log.Debugf("Configmap %s has been patched using SetOwnerReferences", configmap)
+
+	configmapObj, err = c.apiClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), configmap, metav1.GetOptions{})
+	if err != nil {
+		log.Fatalf("Failed to get configmap: %s, after patching using SetOwnerReferences, err: %s", configmap, err)
+	}
+
+	// Get the configmap's OwnerReferences
+	obj := configmapObj.ObjectMeta.GetOwnerReferences()
+	log.Debugf("OwnerRegerences after patching using SetOwnerReferences is: %s", obj)
+
+	// Compare the configmap's OwnerReferences to what it needs to be
+	if !reflect.DeepEqual(obj, newOwnerReferences) {
+		log.Debugf("Patching failed using SetOwnerReferences, Wanted: %s, Got: %s", newOwnerReferences, obj)
+		// Patch the configmap using Patch command
+		log.Debugf("Going to patch configmap %s using Patch command", configmap)
+		out, err := c.apiClient.CoreV1().ConfigMaps(namespace).Patch(context.Background(), configmap, types.MergePatchType, []byte(patch), v1.PatchOptions{})
+		if err != nil {
+			log.Fatalf("Failed to patch the configmap: %s, using Patch command, err: %s", configmap, err)
+		}
+		log.Debugf("Configmap %s has been patched using Patch command, output is: %s", configmap, out)
+
+		configmapObj, err = c.apiClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), configmap, metav1.GetOptions{})
+		if err != nil {
+			log.Fatalf("Failed to get configmap: %s, after patching with .Patch, err: %s", configmap, err)
+		}
+
+		obj = configmapObj.ObjectMeta.GetOwnerReferences()
+		log.Debugf("OwnerRegerences after patching with .Patch is: %s", obj)
+		if !reflect.DeepEqual(obj, newOwnerReferences) {
+			log.Fatalf("Patching failed using Patch command, Wanted: %s, Got: %s", newOwnerReferences, obj)
+		}
+	}
 }
 
 // getKubeConfigPath returns the filepath to the local kubeConfig file or fails if it couldn't find it

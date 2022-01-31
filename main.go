@@ -18,22 +18,22 @@ func Runner(configMapPtr string, rolloutPtr string, namespacePtr string, opts *o
 	// Bootstrap k8s configuration from local 	Kubernetes config file
 	kubernetesClient, err := kubernetes.NewClient(opts)
 	if err != nil {
-		log.Fatal("failed to initialize kubernetes client: '%v'", err)
+		log.Fatalf("failed to initialize kubernetes client: '%v'", err)
 	}
 	newRs, err := kubernetesClient.GetRolloutInfo(namespacePtr, rolloutPtr)
 	if err != nil {
-		log.Fatal("currentPodHash was not found in rollout: '%v'", err)
+		log.Fatalf("currentPodHash was not found in rollout: '%v'", err)
 	}
 	uid, err := kubernetesClient.GetReplicaSetInfo(namespacePtr, rolloutPtr+"-"+newRs)
 	if err != nil {
-		log.Fatal("Replicaset was not found: '%v'", err)
+		log.Fatalf("Replicaset was not found: '%v'", err)
 	}
 
 	// Split the configmaps
 	configmaps := strings.Split(configMapPtr, ",")
 	// Patch each configmap
 	for i, configmap := range configmaps {
-		log.Debug("Patching configmap: ", i, configmap)
+		log.Debugf("Patching configmap, number: %d, name: %s, namespace: %s, rollout: %s, replicaSet: %s, uid: %s", i, configmap, namespacePtr, rolloutPtr, newRs, uid)
 		kubernetesClient.PatchConfigmap(configmap, namespacePtr, rolloutPtr, newRs, uid)
 	}
 }
@@ -57,13 +57,13 @@ func main() {
 	opts := options.NewOptions()
 	err := envconfig.Process("", opts)
 	if err != nil {
-		log.Fatal("Error parsing env vars into opts", err)
+		log.Fatalf("Error parsing env vars into opts", err)
 	}
 
 	// Set log level from environment variable
 	level, err := log.ParseLevel(opts.LogLevel)
 	if err != nil {
-		log.Fatal("Loglevel could not be parsed as one of the known loglevels. See logrus documentation for valid log level inputs. Given input was: '%s'", opts.LogLevel)
+		log.Fatalf("Loglevel could not be parsed as one of the known loglevels. See logrus documentation for valid log level inputs. Given input was: '%s'", opts.LogLevel)
 	}
 	log.SetLevel(level)
 	log.Infof("Starting configmap-attacher version: %v", opts.Version)
