@@ -22,10 +22,10 @@ On every deploy, attach the revisioned configmaps to the new ReplicaSets, and ut
 ## Environment Variables
 | Variable name | Description | Default | Required |
 | --- | --- | --- | --- |
-| IS_IN_CLUSTER | Whether to use in cluster communication or to look for a kubeconfig in home directory | true | N/A |
-| LOG_LEVEL | Logger's log granularity (debug, info, warn, error, fatal, panic) | info |N/A |
+| IS_IN_CLUSTER | Whether to use in cluster communication or to look for a kubeconfig in home directory | true | false |
+| LOG_LEVEL | Logger's log granularity (debug, info, warn, error, fatal, panic) | info | false |
 | VERSION | For logging audit, please add the version of the configmap-attacher | None | true |
-| JOB_NAME | For logging audit, you can add the Job name in the Kubernetes cluster | None | true |
+| JOB_NAME | For logging audit, you can add the Job name in the Kubernetes cluster | "" | false |
 ## Permissions
 To make the configmap-attacher work on any namespace, it's better to deploy it in kube-system with ClusterRole permissions; you can use the following:
 
