@@ -9,6 +9,10 @@ type Options struct {
 	// IsInCluster - Whether to use in cluster communication (if deployed inside of Kubernetes) or to look for a kubeconfig in home directory
 	IsInCluster bool `envconfig:"IS_IN_CLUSTER" default:"true"`
 
+	// Kubernetes
+	// JobName - The name of the Batch Job for visibility using Kubernetes metrics.
+	JobName string `envconfig:"JOB_NAME" default:""`
+
 	// Logger
 	// LogLevel - Logger's log granularity (debug, info, warn, error, fatal, panic)
 	LogLevel string `envconfig:"LOG_LEVEL" default:"info"`

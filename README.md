@@ -25,6 +25,7 @@ On every deploy, attach the revisioned configmaps to the new ReplicaSets, and ut
 | IS_IN_CLUSTER | Whether to use in cluster communication or to look for a kubeconfig in home directory | true | N/A |
 | LOG_LEVEL | Logger's log granularity (debug, info, warn, error, fatal, panic) | info |N/A |
 | VERSION | For logging audit, please add the version of the configmap-attacher | None | true |
+| JOB_NAME | For logging audit, you can add the Job name in the Kubernetes cluster | None | true |
 ## Permissions
 To make the configmap-attacher work on any namespace, it's better to deploy it in kube-system with ClusterRole permissions; you can use the following:
 
@@ -113,6 +114,8 @@ spec:
         env:
           - name: VERSION
             value: "1.0.1"
+          - name: JOB_NAME
+            value: "configmap-attacher-job"
       restartPolicy: OnFailure
       serviceAccountName: configmap-attacher-job
 ```

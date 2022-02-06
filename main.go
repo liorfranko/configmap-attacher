@@ -67,7 +67,7 @@ func main() {
 	}
 	log.SetLevel(level)
 	log.Infof("Starting configmap-attacher version: %v", opts.Version)
-	log.Infof("configmaps: %s, rollout: %s, namespace: %s\n", *configMapPtr, *rolloutPtr, *namespacePtr)
+	log.Infof("configmaps: %s, rollout: %s, namespace: %s, jobName: %s", *configMapPtr, *rolloutPtr, *namespacePtr, opts.JobName)
 	// Start configmap-attacher
 	Runner(*configMapPtr, *rolloutPtr, *namespacePtr, opts)
 	log.Infof("Done configmap-attacher")
